@@ -23,6 +23,11 @@ socket = /run/mysqld/mysqld.sock
 socket = /run/mysqld/mysqld.sock
 EOF
 
+# Função para verificar se o MySQL está pronto
+check_mysql() {
+    mysqladmin -u root -proot ping 2>/dev/null
+}
+
 # Inicializa o banco de dados se necessário
 if [ ! -d "/var/lib/mysql/mysql" ]; then
     echo "Inicializando MariaDB..."
@@ -32,10 +37,20 @@ if [ ! -d "/var/lib/mysql/mysql" ]; then
     mysqld --user=mysql --datadir=/var/lib/mysql --skip-networking &
     MYSQL_PID=$!
     
-    # Espera o processo iniciar
-    while ! mysqladmin ping --silent; do
+    # Espera o processo iniciar com timeout
+    max_tries=30
+    counter=0
+    until check_mysql || [ $counter -eq $max_tries ]
+    do
+        echo "Aguardando MySQL iniciar... ($counter/$max_tries)"
         sleep 1
+        counter=$((counter + 1))
     done
+
+    if [ $counter -eq $max_tries ]; then
+        echo "Timeout aguardando MySQL iniciar"
+        exit 1
+    fi
 
     echo "Configurando usuários e banco de dados..."
     mysql << EOF
@@ -58,11 +73,21 @@ echo "Iniciando MariaDB..."
 mysqld --user=mysql --datadir=/var/lib/mysql &
 MYSQL_PID=$!
 
-# Espera o MariaDB ficar pronto
+# Espera o MariaDB ficar pronto com timeout
 echo "Aguardando MariaDB ficar pronto..."
-while ! mysqladmin -u root -proot ping --silent; do
+max_tries=30
+counter=0
+until check_mysql || [ $counter -eq $max_tries ]
+do
+    echo "Aguardando MySQL ficar pronto... ($counter/$max_tries)"
     sleep 1
+    counter=$((counter + 1))
 done
+
+if [ $counter -eq $max_tries ]; then
+    echo "Timeout aguardando MySQL ficar pronto"
+    exit 1
+fi
 
 echo "MariaDB está pronto!"
 
