@@ -1,21 +1,32 @@
-FROM golang:1.21-alpine
-
+# Estágio de construção do Go
+FROM golang:1.21-alpine AS builder
 WORKDIR /app
 
-# Copy go mod and sum files
-COPY go.mod ./
+# Instalar dependências do MySQL
+RUN apk add --no-cache gcc musl-dev mysql-client
 
-# Download all dependencies
-RUN go mod download
-
-# Copy the source code
+# Copiar e construir a aplicação
 COPY . .
+RUN go mod download
+RUN go build -o /myapp
 
-# Build the application
-RUN go build -o main .
+# Estágio de execução final
+FROM alpine:latest
+WORKDIR /app
 
-# Expose port 8080
-EXPOSE 8080
+# Instalar dependências do MySQL e ferramentas
+RUN apk add --no-cache mariadb mariadb-client
 
-# Command to run the executable
-CMD ["./main"] 
+# Copiar binário da aplicação e arquivos necessários
+COPY --from=builder /myapp /app/myapp
+COPY .env /app/.env
+COPY entrypoint.sh /app/entrypoint.sh
+
+# Configurar diretórios e permissões
+RUN mkdir -p /run/mysqld /var/lib/mysql && \
+    chown -R mysql:mysql /run/mysqld /var/lib/mysql && \
+    chmod +x /app/entrypoint.sh
+
+EXPOSE 8080 3306
+
+ENTRYPOINT ["/app/entrypoint.sh"]
