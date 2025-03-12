@@ -32,8 +32,8 @@ ENV DB_USER=root \
     DB_HOST=127.0.0.1 \
     DB_PORT=3306 \
     DB_NAME=people_db \
-    PORT=8080
+    PORT=8081
 
-EXPOSE 8080 3306
+EXPOSE 8081 3306
 
 ENTRYPOINT ["/app/entrypoint.sh"]
